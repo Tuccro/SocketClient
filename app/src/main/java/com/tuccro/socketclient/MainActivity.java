@@ -3,6 +3,7 @@ package com.tuccro.socketclient;
 import android.app.Activity;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -10,7 +11,10 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.Socket;
 
 
@@ -55,12 +59,17 @@ public class MainActivity extends Activity {
 
             switch (v.getId()) {
                 case R.id.button_connect:
-                    ConnectionCreator creator = new ConnectionCreator("", 1488);
+                    ConnectionCreator creator = new ConnectionCreator(editTextIP.getText().toString(),
+                            Integer.parseInt(editTextPort.getText().toString()));
                     creator.execute();
                     break;
 
                 case R.id.button_send:
-
+                    String message;
+                    if ((message = editTextMessage.getText().toString()) != null) {
+                        Messenger messenger = new Messenger(message);
+                        messenger.execute();
+                    }
                     break;
             }
         }
@@ -80,8 +89,7 @@ public class MainActivity extends Activity {
         protected Object doInBackground(Object[] params) {
 
             int retries = 3;
-
-            while (retries == 0) {
+            while (retries > 0) {
                 try {
                     socket = new Socket(url, port);
                     return null;
@@ -90,7 +98,6 @@ public class MainActivity extends Activity {
                     retries--;
                 }
             }
-
             return null;
         }
 
@@ -106,7 +113,7 @@ public class MainActivity extends Activity {
 
             buttonConnect.setEnabled(true);
 
-            if(socket!=null){
+            if (socket != null) {
                 Toast toast = Toast.makeText(getApplicationContext(), "Connection Established", Toast.LENGTH_SHORT);
                 toast.show();
                 layoutSendMessage.setVisibility(View.VISIBLE);
@@ -116,5 +123,63 @@ public class MainActivity extends Activity {
                 layoutSendMessage.setVisibility(View.INVISIBLE);
             }
         }
+    }
+
+    private class Messenger extends AsyncTask {
+
+        String messageOut;
+        String messageIn = "";
+        BufferedReader input;
+
+        public Messenger(String messageOut) {
+            this.messageOut = messageOut;
+        }
+
+        @Override
+        protected Object doInBackground(Object[] params) {
+
+            if (socket != null && !socket.isClosed()) {
+                try {
+                    input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                    serverMessageReader.start();
+
+                    PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+                    out.print(messageOut);
+                    out.close();
+
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Object o) {
+            super.onPostExecute(o);
+            textAnswer.setText(messageIn);
+        }
+
+        Thread serverMessageReader = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    while (true) {
+                        Log.e("Message", String.valueOf(socket.isClosed()));
+                        //if (input.ready()) {
+                            messageIn = messageIn + input.readLine();
+                            Log.e("Message", messageIn);
+                            input.close();
+                        //}
+                    }
+
+                } catch (IOException e) {
+                    //e.printStackTrace();
+                }
+
+            }
+        });
     }
 }
