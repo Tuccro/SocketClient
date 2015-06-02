@@ -116,6 +116,8 @@ public class MainActivity extends Activity {
             if (socket != null) {
                 Toast toast = Toast.makeText(getApplicationContext(), "Connection Established", Toast.LENGTH_SHORT);
                 toast.show();
+                MessageReader messageReader = new MessageReader();
+                messageReader.execute();
                 layoutSendMessage.setVisibility(View.VISIBLE);
             } else {
                 Toast toast = Toast.makeText(getApplicationContext(), "Connection ERROR", Toast.LENGTH_SHORT);
@@ -128,8 +130,6 @@ public class MainActivity extends Activity {
     private class Messenger extends AsyncTask {
 
         String messageOut;
-        String messageIn = "";
-        BufferedReader input;
 
         public Messenger(String messageOut) {
             this.messageOut = messageOut;
@@ -140,46 +140,49 @@ public class MainActivity extends Activity {
 
             if (socket != null && !socket.isClosed()) {
                 try {
-                    input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                    serverMessageReader.start();
 
                     PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
                     out.print(messageOut);
                     out.close();
 
-
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
+            return null;
+        }
+    }
 
+    private class MessageReader extends AsyncTask {
+
+        BufferedReader input;
+        String message = null;
+        Boolean run = true;
+
+        @Override
+        protected Object doInBackground(Object[] params) {
+            try {
+                input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+                while (run) {
+
+                    Log.e("Message", String.valueOf(socket.isClosed()));
+                    message = input.readLine();
+
+                    if (message != null) run = false;
+                }
+                Log.e("Message", "—¬≈–ÿ»ÀŒ—‹!!!");
+                input.close();
+            } catch (IOException e) {
+
+            }
             return null;
         }
 
         @Override
         protected void onPostExecute(Object o) {
             super.onPostExecute(o);
-            textAnswer.setText(messageIn);
+            textAnswer.setText(message);
         }
-
-        Thread serverMessageReader = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    while (true) {
-                        Log.e("Message", String.valueOf(socket.isClosed()));
-                        //if (input.ready()) {
-                            messageIn = messageIn + input.readLine();
-                            Log.e("Message", messageIn);
-                            input.close();
-                        //}
-                    }
-
-                } catch (IOException e) {
-                    //e.printStackTrace();
-                }
-
-            }
-        });
     }
 }
