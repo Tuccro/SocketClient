@@ -171,7 +171,7 @@ public class MainActivity extends Activity {
 
                     if (message != null) run = false;
                 }
-                Log.e("Message", "—¬≈–ÿ»ÀŒ—‹!!!");
+                Log.e("Message", "Congratulations!");
                 input.close();
             } catch (IOException e) {
 
