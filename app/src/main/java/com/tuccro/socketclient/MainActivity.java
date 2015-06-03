@@ -13,6 +13,7 @@ import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
@@ -32,6 +33,11 @@ public class MainActivity extends Activity {
     TextView textAnswer;
 
     LinearLayout layoutSendMessage;
+
+    String serverIP;
+    int serverPort;
+
+    String messageFromServer = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,16 +65,19 @@ public class MainActivity extends Activity {
 
             switch (v.getId()) {
                 case R.id.button_connect:
-                    ConnectionCreator creator = new ConnectionCreator(editTextIP.getText().toString(),
-                            Integer.parseInt(editTextPort.getText().toString()));
+                    serverIP = editTextIP.getText().toString();
+                    serverPort = Integer.parseInt(editTextPort.getText().toString());
+                    ConnectionCreator creator = new ConnectionCreator(serverIP, serverPort);
                     creator.execute();
                     break;
 
                 case R.id.button_send:
                     String message;
                     if ((message = editTextMessage.getText().toString()) != null) {
-                        Messenger messenger = new Messenger(message);
-                        messenger.execute();
+                        new MessageReader().start();
+                        MessageSeeker messageSeeker = new MessageSeeker();
+                        messageSeeker.execute();
+                        new MessageWriter(message).start();
                     }
                     break;
             }
@@ -92,6 +101,7 @@ public class MainActivity extends Activity {
             while (retries > 0) {
                 try {
                     socket = new Socket(url, port);
+
                     return null;
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -116,8 +126,6 @@ public class MainActivity extends Activity {
             if (socket != null) {
                 Toast toast = Toast.makeText(getApplicationContext(), "Connection Established", Toast.LENGTH_SHORT);
                 toast.show();
-                MessageReader messageReader = new MessageReader();
-                messageReader.execute();
                 layoutSendMessage.setVisibility(View.VISIBLE);
             } else {
                 Toast toast = Toast.makeText(getApplicationContext(), "Connection ERROR", Toast.LENGTH_SHORT);
@@ -127,62 +135,73 @@ public class MainActivity extends Activity {
         }
     }
 
-    private class Messenger extends AsyncTask {
+    private class MessageSeeker extends AsyncTask {
 
-        String messageOut;
-
-        public Messenger(String messageOut) {
-            this.messageOut = messageOut;
-        }
-
-        @Override
-        protected Object doInBackground(Object[] params) {
-
-            if (socket != null && !socket.isClosed()) {
-                try {
-
-                    PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-                    out.print(messageOut);
-                    out.close();
-
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-            return null;
-        }
-    }
-
-    private class MessageReader extends AsyncTask {
-
-        BufferedReader input;
-        String message = null;
         Boolean run = true;
 
         @Override
         protected Object doInBackground(Object[] params) {
-            try {
-                input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
-                while (run) {
-
-                    Log.e("Message", String.valueOf(socket.isClosed()));
-                    message = input.readLine();
-
-                    if (message != null) run = false;
+//
+            while (run) {
+                Log.e("MESSAGE", messageFromServer);
+                if (messageFromServer.length() > 1) {
+                    run = false;
                 }
-                Log.e("Message", "Congratulations!");
-                input.close();
-            } catch (IOException e) {
-
             }
+            Log.e("Message", "Congratulations!");
+
             return null;
         }
 
         @Override
         protected void onPostExecute(Object o) {
             super.onPostExecute(o);
-            textAnswer.setText(message);
+            textAnswer.setText(messageFromServer);
+        }
+    }
+
+    class MessageWriter extends Thread {
+
+        String message;
+
+        public MessageWriter(String message) {
+            this.message = message;
+        }
+
+        @Override
+        public void run() {
+            super.run();
+            PrintWriter out = null;
+            try {
+                out = new PrintWriter(socket.getOutputStream());
+                out.print(message);
+                out.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    class MessageReader extends Thread {
+        @Override
+        public void run() {
+            boolean w = true;
+            while (w) {
+                try {
+//                    socket = new Socket(serverIP, serverPort);
+                    InputStream inputStream = socket.getInputStream();
+                    BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
+                    messageFromServer = br.readLine();
+                    if (inputStream != null)
+                        inputStream.close();
+                    if (br != null)
+                        br.close();
+                    w = false;
+                } catch (IOException e) {
+                    e.printStackTrace();
+//                    messageFromServer = "Error in the Run method "+ e.toString();
+                }
+            }
         }
     }
 }
